@@ -1,603 +1,324 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เครื่องคำนวณค่านำเข้าสินค้า (Professional Edition)</title>
-    <!-- Libraries -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+import React, { useState, useEffect } from 'react';
+import { 
+  Truck, Package, Scale, Maximize, Calculator, 
+  Info, Box, Plus, Trash2, ChevronDown, ChevronUp,
+  ReceiptText, Summary, Tag
+} from 'lucide-react';
+
+const App = () => {
+  // สถานะสำหรับอัตราค่าบริการ
+  const [rateKg, setRateKg] = useState(15);
+  const [rateCbm, setRateCbm] = useState(6000);
+
+  // สถานะสำหรับรายการพัสดุทั้งหมด
+  const [items, setItems] = useState([
+    {
+      id: Date.now(),
+      name: '', // เพิ่มสถานะสำหรับชื่อพัสดุ
+      weight: '',
+      width: '',
+      length: '',
+      height: '',
+      manualCbm: '',
+      inputMode: 'dimensions',
+    }
+  ]);
+
+  // ฟังก์ชันเพิ่มรายการใหม่
+  const addItem = () => {
+    const newItem = {
+      id: Date.now(),
+      name: '',
+      weight: '',
+      width: '',
+      length: '',
+      height: '',
+      manualCbm: '',
+      inputMode: 'dimensions',
+    };
+    setItems([...items, newItem]);
+  };
+
+  // ฟังก์ชันลบรายการ
+  const removeItem = (id) => {
+    if (items.length > 1) {
+      setItems(items.filter(item => item.id !== id));
+    }
+  };
+
+  // ฟังก์ชันอัปเดตข้อมูลในแต่ละรายการ
+  const updateItem = (id, field, value) => {
+    setItems(items.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  // คำนวณผลลัพธ์ของแต่ละรายการ
+  const calculateItemResults = (item) => {
+    const w = parseFloat(item.weight) || 0;
+    const width = parseFloat(item.width) || 0;
+    const l = parseFloat(item.length) || 0;
+    const h = parseFloat(item.height) || 0;
+    const mCbm = parseFloat(item.manualCbm) || 0;
     
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Kanit', sans-serif; }
-        input::-webkit-outer-spin-button,
-        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .tab-active { background-color: #2563eb; color: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        .tab-inactive { background-color: transparent; color: #64748b; }
+    const rKg = parseFloat(rateKg) || 0;
+    const rCbm = parseFloat(rateCbm) || 0;
+
+    const cbm = item.inputMode === 'dimensions' 
+      ? (width * l * h) / 1000000 
+      : mCbm;
+    
+    const pWeight = w * rKg;
+    const pCbm = cbm * rCbm;
+    const useCost = Math.max(pWeight, pCbm);
+
+    return { cbm, pWeight, pCbm, useCost };
+  };
+
+  // คำนวณยอดรวมทั้งหมด
+  const totals = items.reduce((acc, item) => {
+    const res = calculateItemResults(item);
+    return {
+      totalWeight: acc.totalWeight + (parseFloat(item.weight) || 0),
+      totalCbm: acc.totalCbm + res.cbm,
+      totalCost: acc.totalCost + res.useCost
+    };
+  }, { totalWeight: 0, totalCbm: 0, totalCost: 0 });
+
+  const formatNumber = (num, digits = 2) => {
+    if (num === 0) return '0';
+    return new Intl.NumberFormat('th-TH', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits,
+    }).format(num || 0);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800 pb-48">
+      <div className="max-w-3xl mx-auto space-y-6">
         
-        #pdfReport {
-            width: 800px;
-            padding: 40px;
-            background: white;
-            position: absolute;
-            left: -9999px;
-            top: 0;
-        }
+        {/* Header */}
+        <header className="bg-blue-600 text-white p-8 rounded-3xl shadow-lg flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Truck size={32} />
+              ระบบคำนวณค่าขนส่ง
+            </h1>
+            <p className="opacity-90 text-base mt-1">Multi-item Shipping Calculator</p>
+          </div>
+          <Calculator size={48} className="opacity-20" />
+        </header>
 
-        @keyframes slideIn {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
-    </style>
-</head>
-<body class="bg-slate-50 min-h-screen py-6 px-4 md:py-12">
-
-    <div class="max-w-5xl mx-auto">
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
-            <div class="flex items-center gap-4">
-                <div class="p-3 bg-blue-600 rounded-2xl shadow-lg text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-                </div>
-                <div>
-                    <h1 class="text-2xl md:text-3xl font-bold text-slate-900">Import Calculator</h1>
-                    <p class="text-slate-500 text-sm">เปรียบเทียบราคา น้ำหนัก vs ปริมาตร</p>
-                </div>
+        {/* Rates Config */}
+        <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2 border-b pb-2 text-slate-700">
+            <Info size={20} className="text-blue-500" />
+            ตั้งค่าอัตราค่าบริการ (Rates)
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-slate-500">ราคาต่อกิโลกรัม (฿/Kg.)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-base font-bold">฿</span>
+                <input 
+                  type="number" 
+                  value={rateKg} 
+                  onChange={(e) => setRateKg(e.target.value)}
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg"
+                />
+              </div>
             </div>
-            
-            <div id="authStatus" class="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
-                <div class="w-2 h-2 rounded-full bg-slate-300 animate-pulse" id="statusDot"></div>
-                <span class="text-xs font-medium text-slate-500" id="statusText">กำลังเชื่อมต่อ...</span>
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-slate-500">ราคาต่อคิว (฿/CBM)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-2.5 text-slate-400 text-base font-bold">฿</span>
+                <input 
+                  type="number" 
+                  value={rateCbm} 
+                  onChange={(e) => setRateCbm(e.target.value)}
+                  className="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg"
+                />
+              </div>
             </div>
-        </div>
+          </div>
+        </section>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
-            <!-- Sidebar: Input Form -->
-            <div class="lg:col-span-4 space-y-6">
-                <div class="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
-                    <div class="flex items-center justify-between mb-6">
-                        <h2 class="font-bold text-lg text-slate-800">ข้อมูลสินค้า</h2>
-                        <button onclick="clearInputs()" class="text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1 text-xs font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                            ล้างข้อมูล
-                        </button>
-                    </div>
+        {/* Items List */}
+        <div className="space-y-6">
+          <div className="flex justify-between items-center px-2">
+            <h2 className="text-xl font-bold flex items-center gap-2 text-slate-700">
+              <Package size={24} className="text-orange-500" />
+              รายการพัสดุ ({items.length})
+            </h2>
+            <button 
+              onClick={addItem}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-base font-bold transition-all shadow-md active:scale-95"
+            >
+              <Plus size={20} /> เพิ่มรายการ
+            </button>
+          </div>
 
-                    <div class="space-y-5">
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">ชื่อรายการ / รหัส</label>
-                            <input type="text" id="itemName" class="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-slate-300" placeholder="เช่น เครื่องจักร A-101">
-                        </div>
+          {items.map((item, index) => {
+            const res = calculateItemResults(item);
+            const isCbmHigher = res.pCbm > res.pWeight;
 
-                        <div class="space-y-1.5">
-                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider">น้ำหนักรวม (KG)</label>
-                            <input type="number" id="weight" step="0.01" class="calc-input w-full p-4 bg-blue-50 border border-blue-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-semibold text-blue-700 text-lg" placeholder="0.00">
-                        </div>
+            return (
+              <div key={item.id} className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden group animate-in slide-in-from-top-2 duration-300">
+                {/* Item Header */}
+                <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-b border-slate-100">
+                  <div className="flex items-center gap-3 flex-grow mr-4">
+                    <span className="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
+                      {index + 1}
+                    </span>
+                    <input 
+                      type="text"
+                      placeholder={`ตั้งชื่อรายการที่ ${index + 1} (เช่น อะไหล่, เสื้อผ้า)`}
+                      value={item.name}
+                      onChange={(e) => updateItem(item.id, 'name', e.target.value)}
+                      className="bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none text-lg font-bold text-slate-700 w-full placeholder:text-slate-300 placeholder:font-normal"
+                    />
+                  </div>
+                  {items.length > 1 && (
+                    <button 
+                      onClick={() => removeItem(item.id)}
+                      className="text-slate-400 hover:text-red-500 p-2 transition-colors bg-white rounded-lg border border-slate-100 shadow-sm shrink-0"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                </div>
 
-                        <div class="p-1 bg-slate-100 rounded-2xl flex">
-                            <button id="tabDim" onclick="switchMode('dim')" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-active">ระบุขนาด (cm)</button>
-                            <button id="tabCbm" onclick="switchMode('cbm')" class="flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-inactive">ระบุ CBM ตรง</button>
-                        </div>
+                <div className="p-6 grid grid-cols-1 md:grid-cols-12 gap-8">
+                  {/* Left: Inputs */}
+                  <div className="md:col-span-7 space-y-6">
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase font-black text-slate-400 tracking-widest flex items-center gap-1">
+                          <Scale size={12} /> น้ำหนัก (Kg.)
+                        </label>
+                        <input 
+                          type="number" 
+                          placeholder="0.00"
+                          value={item.weight} 
+                          onChange={(e) => updateItem(item.id, 'weight', e.target.value)}
+                          className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-xl"
+                        />
+                      </div>
 
-                        <div id="modeDim" class="grid grid-cols-3 gap-3">
-                            <div class="space-y-1">
-                                <span class="text-[10px] text-slate-400 font-bold px-1 uppercase text-center block">กว้าง</span>
-                                <input type="number" id="width" class="calc-input w-full p-3 text-center bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="W">
-                            </div>
-                            <div class="space-y-1">
-                                <span class="text-[10px] text-slate-400 font-bold px-1 uppercase text-center block">ยาว</span>
-                                <input type="number" id="length" class="calc-input w-full p-3 text-center bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="L">
-                            </div>
-                            <div class="space-y-1">
-                                <span class="text-[10px] text-slate-400 font-bold px-1 uppercase text-center block">สูง</span>
-                                <input type="number" id="height" class="calc-input w-full p-3 text-center bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-blue-400" placeholder="H">
-                            </div>
-                        </div>
-
-                        <div id="modeCbm" class="hidden">
-                            <input type="number" id="inputDirectCbm" step="0.0001" class="calc-input w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-sm font-semibold" placeholder="0.0000 CBM">
-                        </div>
-
-                        <div class="pt-4 grid grid-cols-2 gap-4">
-                            <div class="space-y-1.5">
-                                <label class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">เรทราคา / KG</label>
-                                <input type="number" id="rateKg" value="35" class="calc-input w-full p-3 text-sm bg-white border border-slate-200 rounded-xl font-bold text-slate-700">
-                            </div>
-                            <div class="space-y-1.5">
-                                <label class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">เรทราคา / CBM</label>
-                                <input type="number" id="rateCbm" value="6500" class="calc-input w-full p-3 text-sm bg-white border border-slate-200 rounded-xl font-bold text-slate-700">
-                            </div>
-                        </div>
-
-                        <!-- Button added here for Sidebar -->
-                        <div class="pt-4">
-                            <button id="addBtnSidebar" onclick="addItem()" class="w-full bg-blue-600 text-white p-4 rounded-2xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-blue-200 group">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                เพิ่มไปที่รายการบันทึก
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <label className="text-xs uppercase font-black text-slate-400 tracking-widest flex items-center gap-1">
+                            <Tag size={12} /> ขนาดหรือปริมาตร
+                          </label>
+                          <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
+                            <button 
+                              onClick={() => updateItem(item.id, 'inputMode', 'dimensions')}
+                              className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${item.inputMode === 'dimensions' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                            >
+                              SIZE (W/L/H)
                             </button>
+                            <button 
+                              onClick={() => updateItem(item.id, 'inputMode', 'direct_cbm')}
+                              className={`px-4 py-1.5 text-xs font-black rounded-lg transition-all ${item.inputMode === 'direct_cbm' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                            >
+                              CBM (คิว)
+                            </button>
+                          </div>
                         </div>
+
+                        {item.inputMode === 'dimensions' ? (
+                          <div className="grid grid-cols-3 gap-3">
+                            <input 
+                              type="number" placeholder="กว้าง" value={item.width}
+                              onChange={(e) => updateItem(item.id, 'width', e.target.value)}
+                              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <input 
+                              type="number" placeholder="ยาว" value={item.length}
+                              onChange={(e) => updateItem(item.id, 'length', e.target.value)}
+                              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                            <input 
+                              type="number" placeholder="สูง" value={item.height}
+                              onChange={(e) => updateItem(item.id, 'height', e.target.value)}
+                              className="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                          </div>
+                        ) : (
+                          <input 
+                            type="number" step="0.0001" placeholder="ระบุจำนวนคิว (CBM)" value={item.manualCbm}
+                            onChange={(e) => updateItem(item.id, 'manualCbm', e.target.value)}
+                            className="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                          />
+                        )}
+                      </div>
                     </div>
-                </div>
-            </div>
+                  </div>
 
-            <!-- Main Content: Preview and Totals -->
-            <div class="lg:col-span-8 space-y-6">
-                <div id="resultCard" class="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 h-full flex flex-col relative overflow-hidden">
-                    <!-- Background Decoration -->
-                    <div class="absolute -top-12 -right-12 w-48 h-48 bg-blue-50 rounded-full blur-3xl opacity-50"></div>
-                    
-                    <div class="relative z-10 flex flex-col h-full">
-                        <div class="flex items-center gap-2 mb-8">
-                            <div class="w-2 h-6 bg-blue-600 rounded-full"></div>
-                            <h2 class="text-xl font-bold text-slate-800">สรุปการคำนวณเบื้องต้น</h2>
-                        </div>
-
-                        <div id="emptyState" class="flex-1 flex flex-col items-center justify-center text-slate-400 py-12 text-center">
-                            <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-                            </div>
-                            <p class="text-lg font-medium text-slate-500">พร้อมคำนวณราคาที่ดีที่สุดให้คุณ</p>
-                            <p class="text-sm">ใส่ข้อมูล น้ำหนัก และ ขนาด ด้านซ้ายมือ</p>
-                        </div>
-
-                        <div id="resultContent" class="hidden flex-1 flex flex-col justify-between animate-slide-in">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                                <div class="bg-slate-50/80 backdrop-blur-sm p-5 rounded-3xl border border-white">
-                                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">ปริมาตรรวม</p>
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="text-3xl font-bold text-slate-900" id="dispCbm">0.0000</span>
-                                        <span class="text-xs text-slate-400 font-medium">CBM</span>
-                                    </div>
-                                </div>
-                                <div class="bg-slate-50/80 backdrop-blur-sm p-5 rounded-3xl border border-white">
-                                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">ราคาหากคิดตาม KG</p>
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="text-2xl font-bold text-slate-600" id="dispPriceWeight">0.00</span>
-                                        <span class="text-xs text-slate-400 font-medium">บาท</span>
-                                    </div>
-                                </div>
-                                <div class="bg-slate-50/80 backdrop-blur-sm p-5 rounded-3xl border border-white">
-                                    <p class="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2">ราคาหากคิดตาม CBM</p>
-                                    <div class="flex items-baseline gap-1">
-                                        <span class="text-2xl font-bold text-slate-600" id="dispPriceCbm">0.00</span>
-                                        <span class="text-xs text-slate-400 font-medium">บาท</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="bg-blue-600 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-blue-200 flex flex-col md:flex-row items-center justify-between gap-6 transition-transform hover:scale-[1.01]">
-                                <div class="text-center md:text-left">
-                                    <div class="inline-flex items-center gap-2 px-3 py-1 bg-blue-500/50 rounded-full text-[10px] font-bold uppercase tracking-widest mb-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                        ราคาที่แนะนำสำหรับรายการนี้
-                                    </div>
-                                    <div class="flex items-baseline justify-center md:justify-start gap-2">
-                                        <span class="text-5xl font-black" id="dispTotal">0.00</span>
-                                        <span class="text-xl font-bold opacity-80">บาท</span>
-                                    </div>
-                                </div>
-                                <button onclick="addItem()" class="w-full md:w-auto bg-white text-blue-600 px-8 py-5 rounded-2xl font-bold hover:bg-blue-50 transition-all flex items-center justify-center gap-3 shadow-xl hover:shadow-2xl">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    บันทึกลงรายการ
-                                </button>
-                            </div>
-                        </div>
+                  {/* Right: Item Result */}
+                  <div className="md:col-span-5 bg-slate-50 rounded-2xl p-6 flex flex-col justify-center border border-slate-100 shadow-inner">
+                    <div className="flex justify-between items-center text-sm text-slate-500 mb-4">
+                      <span className="font-mono">CBM: {res.cbm.toFixed(4)}</span>
+                      <span className="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md max-w-[120px] truncate text-center">
+                        {item.name || `ชิ้นที่ ${index + 1}`}
+                      </span>
                     </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center text-base">
+                        <span className={!isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}>ตามน้ำหนัก:</span>
+                        <span className={!isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}>฿{formatNumber(res.pWeight)}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-base">
+                        <span className={isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}>ตามคิว:</span>
+                        <span className={isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}>฿{formatNumber(res.pCbm)}</span>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
+                        <span className="text-sm font-black text-slate-500 uppercase tracking-tighter">ค่าส่งชิ้นนี้:</span>
+                        <span className="text-3xl font-black text-blue-600">฿{formatNumber(res.useCost)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-            </div>
+              </div>
+            );
+          })}
         </div>
 
-        <!-- History Table -->
-        <div class="bg-white p-6 md:p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
-                <div class="flex items-center gap-3">
-                    <div class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </div>
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-800">รายการที่บันทึกแล้ว</h3>
-                        <p class="text-sm text-slate-400">รายการที่ถูกรวมค่านำเข้าทั้งหมด</p>
-                    </div>
-                </div>
-                
-                <div class="flex items-center gap-3">
-                    <button onclick="downloadPDF()" id="pdfBtn" class="hidden flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-700 font-bold rounded-2xl hover:bg-slate-200 transition-all text-sm shadow-sm border border-slate-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                        ส่งออก PDF
-                    </button>
-                    <button id="deleteAllBtn" onclick="deleteAllItems()" class="hidden flex items-center gap-2 px-6 py-3 bg-rose-50 text-rose-600 font-bold rounded-2xl hover:bg-rose-100 transition-all text-sm border border-rose-100">
-                        ล้างรายการทั้งหมด
-                    </button>
-                </div>
+        {/* Floating Footer Summary */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-15px_30px_-10px_rgba(0,0,0,0.15)] p-6 z-50">
+          <div className="max-w-3xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex gap-8 text-center md:text-left overflow-x-auto w-full md:w-auto pb-4 md:pb-0">
+              <div>
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Weight</p>
+                <p className="text-xl font-black text-slate-800">{formatNumber(totals.totalWeight)} <span className="text-sm font-normal text-slate-500 ml-1">Kg</span></p>
+              </div>
+              <div className="border-l border-slate-200 pl-8">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total CBM</p>
+                <p className="text-xl font-black text-slate-800">{totals.totalCbm.toFixed(4)} <span className="text-sm font-normal text-slate-500 ml-1">CBM</span></p>
+              </div>
+              <div className="border-l border-slate-200 pl-8 hidden md:block">
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Items</p>
+                <p className="text-xl font-black text-slate-800">{items.length} <span className="text-sm font-normal text-slate-500 ml-1">Boxes</span></p>
+              </div>
             </div>
-
-            <div class="overflow-x-auto -mx-6 px-6">
-                <table class="w-full min-w-[800px]">
-                    <thead>
-                        <tr class="text-left border-b border-slate-100">
-                            <th class="pb-6 pl-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-1/4">รายการสินค้า</th>
-                            <th class="pb-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">น้ำหนัก (KG)</th>
-                            <th class="pb-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">ปริมาตร (CBM)</th>
-                            <th class="pb-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">การคิดราคา</th>
-                            <th class="pb-6 pr-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">ยอดชำระ</th>
-                            <th class="pb-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">จัดการ</th>
-                        </tr>
-                    </thead>
-                    <tbody id="itemListBody">
-                        <!-- Items injected here -->
-                    </tbody>
-                </table>
+            
+            <div className="flex items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-6 md:pt-0">
+              <div className="text-right flex-grow md:flex-grow-0">
+                <p className="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">Grand Total (รวมทั้งหมด)</p>
+                <p className="text-4xl font-black text-slate-900 leading-none">฿{formatNumber(totals.totalCost)}</p>
+              </div>
+              <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-xl hidden sm:block">
+                <ReceiptText size={32} />
+              </div>
             </div>
-
-            <div id="tableFooter" class="hidden mt-8 pt-8 border-t-2 border-slate-50">
-                <div class="flex flex-col md:flex-row items-center justify-between gap-6 p-8 bg-slate-50 rounded-[2.5rem]">
-                    <div class="flex gap-12 text-center md:text-left">
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">น้ำหนักรวม</p>
-                            <p class="text-2xl font-bold text-slate-900"><span id="totalWeight">0.00</span> <span class="text-sm font-medium opacity-50">KG</span></p>
-                        </div>
-                        <div>
-                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ปริมาตรรวม</p>
-                            <p class="text-2xl font-bold text-slate-900"><span id="totalCbm">0.0000</span> <span class="text-sm font-medium opacity-50">CBM</span></p>
-                        </div>
-                    </div>
-                    <div class="text-center md:text-right">
-                        <p class="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">ยอดชำระรวมสุทธิ</p>
-                        <p class="text-4xl font-black text-blue-600"><span id="grandTotal">0.00</span> <span class="text-xl">บาท</span></p>
-                    </div>
-                </div>
-            </div>
+          </div>
         </div>
+
+        {/* Extra Space for floating footer */}
+        <div className="h-24"></div>
+      </div>
     </div>
+  );
+};
 
-    <!-- Hidden PDF Template -->
-    <div id="pdfReport">
-        <div style="border-bottom: 4px solid #2563eb; padding-bottom: 30px; margin-bottom: 40px; display: flex; justify-content: space-between; align-items: flex-end;">
-            <div>
-                <h1 style="font-size: 32px; font-weight: 800; color: #1e293b; margin: 0; letter-spacing: -0.025em;">ใบสรุปรายการนำเข้าสินค้า</h1>
-                <p style="color: #64748b; font-size: 14px; margin: 8px 0 0 0; font-weight: 500;">รหัสการคำนวณ: <span id="pdfRef"></span></p>
-            </div>
-            <div style="text-align: right;">
-                <p style="color: #1e293b; font-size: 14px; margin: 0; font-weight: 700;">วันที่ออกเอกสาร</p>
-                <p style="color: #64748b; font-size: 14px; margin: 4px 0 0 0;" id="pdfDate"></p>
-            </div>
-        </div>
-
-        <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 40px;">
-            <thead style="background: #f8fafc;">
-                <tr>
-                    <th style="padding: 15px; border-bottom: 2px solid #e2e8f0; text-align: left; font-size: 12px; text-transform: uppercase; color: #64748b;">รายการ</th>
-                    <th style="padding: 15px; border-bottom: 2px solid #e2e8f0; text-align: center; font-size: 12px; text-transform: uppercase; color: #64748b;">น้ำหนัก (KG)</th>
-                    <th style="padding: 15px; border-bottom: 2px solid #e2e8f0; text-align: center; font-size: 12px; text-transform: uppercase; color: #64748b;">ปริมาตร (CBM)</th>
-                    <th style="padding: 15px; border-bottom: 2px solid #e2e8f0; text-align: right; font-size: 12px; text-transform: uppercase; color: #64748b;">ยอดชำระ (บาท)</th>
-                </tr>
-            </thead>
-            <tbody id="pdfTableBody" style="color: #334155; font-size: 14px;"></tbody>
-            <tfoot>
-                <tr>
-                    <td colspan="4" style="padding-top: 20px;"></td>
-                </tr>
-                <tr style="background: #eff6ff; font-weight: 800;">
-                    <td style="padding: 20px; border-radius: 15px 0 0 15px; font-size: 16px;">ยอดรวมสุทธิทั้งสิ้น</td>
-                    <td id="pdfTotalWeight" style="padding: 20px; text-align: center; font-size: 16px;"></td>
-                    <td id="pdfTotalCbm" style="padding: 20px; text-align: center; font-size: 16px;"></td>
-                    <td id="pdfGrandTotal" style="padding: 20px; text-align: right; color: #2563eb; font-size: 22px; border-radius: 0 15px 15px 0;"></td>
-                </tr>
-            </tfoot>
-        </table>
-        
-        <div style="background: #f1f5f9; padding: 25px; border-radius: 20px; color: #64748b; font-size: 11px; line-height: 1.6;">
-            <p style="margin: 0 0 8px 0; font-weight: 700; color: #475569;">เงื่อนไขการคำนวณ:</p>
-            <p style="margin: 0;">1. การคำนวณค่านำเข้าอ้างอิงจากการเปรียบเทียบราคาที่สูงที่สุดระหว่างน้ำหนักรวม (KG) และปริมาตรรวม (CBM) ต่อชิ้น</p>
-            <p style="margin: 4px 0 0 0;">2. ราคาที่ปรากฏเป็นราคาประเมินเบื้องต้น อาจมีการเปลี่ยนแปลงขึ้นอยู่กับประเภทของสินค้าและความเสี่ยงในการนำเข้า</p>
-        </div>
-    </div>
-
-    <!-- Firebase Configuration & Logic -->
-    <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, query, getDocs } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-
-        // Firebase Setup
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'import-pro-calc';
-
-        let currentMode = 'dim';
-        let savedItems = [];
-        let user = null;
-
-        const updateStatus = (loading, text) => {
-            const dot = document.getElementById('statusDot');
-            const statusText = document.getElementById('statusText');
-            if (dot && statusText) {
-                dot.className = `w-2 h-2 rounded-full ${loading ? 'bg-amber-400 animate-pulse' : 'bg-emerald-500'}`;
-                statusText.innerText = text;
-            }
-        };
-
-        const initializeConnection = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth failed:", error);
-                updateStatus(false, "Connection Error");
-            }
-        };
-
-        initializeConnection();
-
-        onAuthStateChanged(auth, (u) => {
-            user = u;
-            if (user) {
-                updateStatus(false, "เชื่อมต่อสำเร็จ");
-                setupRealtimeListener();
-            }
-        });
-
-        const getItemsCollection = () => {
-            if (!user) return null;
-            return collection(db, 'artifacts', appId, 'users', user.uid, 'import_items');
-        };
-
-        const setupRealtimeListener = () => {
-            const col = getItemsCollection();
-            if (!col) return;
-
-            onSnapshot(col, (snapshot) => {
-                savedItems = [];
-                snapshot.forEach(d => savedItems.push({ id: d.id, ...d.data() }));
-                savedItems.sort((a, b) => b.timestamp - a.timestamp);
-                renderItems();
-            }, (error) => console.error("Firestore Listen error:", error));
-        };
-
-        window.switchMode = (mode) => {
-            currentMode = mode;
-            const modeDim = document.getElementById('modeDim');
-            const modeCbm = document.getElementById('modeCbm');
-            const tabDim = document.getElementById('tabDim');
-            const tabCbm = document.getElementById('tabCbm');
-
-            if (mode === 'dim') {
-                modeDim?.classList.remove('hidden');
-                modeCbm?.classList.add('hidden');
-                if (tabDim) tabDim.className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-active";
-                if (tabCbm) tabCbm.className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-inactive";
-            } else {
-                modeDim?.classList.add('hidden');
-                modeCbm?.classList.remove('hidden');
-                if (tabCbm) tabCbm.className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-active";
-                if (tabDim) tabDim.className = "flex-1 py-2.5 text-xs font-bold rounded-xl transition-all tab-inactive";
-            }
-            calculateCurrent();
-        };
-
-        window.calculateCurrent = () => {
-            const weight = parseFloat(document.getElementById('weight').value) || 0;
-            const rKg = parseFloat(document.getElementById('rateKg').value) || 0;
-            const rCbm = parseFloat(document.getElementById('rateCbm').value) || 0;
-            
-            let cbm = 0;
-            if (currentMode === 'dim') {
-                const w = parseFloat(document.getElementById('width').value) || 0;
-                const l = parseFloat(document.getElementById('length').value) || 0;
-                const h = parseFloat(document.getElementById('height').value) || 0;
-                if (w && l && h) cbm = (w * l * h) / 1000000;
-            } else {
-                cbm = parseFloat(document.getElementById('inputDirectCbm').value) || 0;
-            }
-
-            const resultContent = document.getElementById('resultContent');
-            const emptyState = document.getElementById('emptyState');
-
-            if (weight > 0 || cbm > 0) {
-                emptyState?.classList.add('hidden');
-                resultContent?.classList.remove('hidden');
-
-                const costFromWeight = weight * rKg;
-                const costFromCbm = cbm * rCbm;
-                const finalCost = Math.max(costFromWeight, costFromCbm);
-
-                document.getElementById('dispCbm').innerText = cbm.toFixed(4);
-                document.getElementById('dispPriceWeight').innerText = costFromWeight.toLocaleString(undefined, { minimumFractionDigits: 2 });
-                document.getElementById('dispPriceCbm').innerText = costFromCbm.toLocaleString(undefined, { minimumFractionDigits: 2 });
-                document.getElementById('dispTotal').innerText = finalCost.toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-                return { weight, cbm, finalCost, method: costFromWeight >= costFromCbm ? 'KG' : 'CBM' };
-            } else {
-                emptyState?.classList.remove('hidden');
-                resultContent?.classList.add('hidden');
-                return null;
-            }
-        };
-
-        window.addItem = async () => {
-            const result = calculateCurrent();
-            if (!result) {
-                alert("กรุณาระบุน้ำหนัก หรือ ขนาดสินค้าก่อนบันทึก");
-                return;
-            }
-            if (!user) return;
-
-            const name = document.getElementById('itemName').value || `รายการ #${savedItems.length + 1}`;
-            const id = Date.now().toString();
-            
-            try {
-                const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'import_items', id);
-                await setDoc(itemRef, {
-                    name,
-                    weight: result.weight,
-                    cbm: result.cbm,
-                    cost: result.finalCost,
-                    method: result.method,
-                    timestamp: Date.now()
-                });
-                
-                // Success visual feedback
-                const btn = document.getElementById('addBtnSidebar');
-                if (btn) {
-                    const original = btn.innerHTML;
-                    btn.innerHTML = `บันทึกแล้ว! ✨`;
-                    btn.classList.replace('bg-blue-600', 'bg-emerald-500');
-                    setTimeout(() => {
-                        btn.innerHTML = original;
-                        btn.classList.replace('bg-emerald-500', 'bg-blue-600');
-                    }, 1500);
-                }
-
-                document.getElementById('itemName').value = '';
-                document.getElementById('weight').value = '';
-                document.getElementById('width').value = '';
-                document.getElementById('length').value = '';
-                document.getElementById('height').value = '';
-                document.getElementById('inputDirectCbm').value = '';
-                calculateCurrent();
-            } catch (err) {
-                console.error("Save error:", err);
-            }
-        };
-
-        window.removeItem = async (id) => {
-            if (!user) return;
-            try {
-                const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'import_items', id);
-                await deleteDoc(itemRef);
-            } catch (err) { console.error("Delete error:", err); }
-        };
-
-        window.deleteAllItems = async () => {
-            if (!user || savedItems.length === 0) return;
-            if (!confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการทั้งหมด?")) return;
-
-            try {
-                const batch = writeBatch(db);
-                savedItems.forEach(item => {
-                    const itemRef = doc(db, 'artifacts', appId, 'users', user.uid, 'import_items', item.id);
-                    batch.delete(itemRef);
-                });
-                await batch.commit();
-            } catch (err) { console.error("Batch delete error:", err); }
-        };
-
-        const renderItems = () => {
-            const list = document.getElementById('itemListBody');
-            const footer = document.getElementById('tableFooter');
-            const pdfBtn = document.getElementById('pdfBtn');
-            const delAll = document.getElementById('deleteAllBtn');
-
-            if (savedItems.length === 0) {
-                list.innerHTML = `<tr><td colspan="6" class="py-20 text-center text-slate-300 italic font-medium">ยังไม่มีรายการที่ถูกบันทึก</td></tr>`;
-                footer?.classList.add('hidden');
-                pdfBtn?.classList.add('hidden');
-                delAll?.classList.add('hidden');
-                return;
-            }
-
-            footer?.classList.remove('hidden');
-            pdfBtn?.classList.remove('hidden');
-            delAll?.classList.remove('hidden');
-            list.innerHTML = '';
-
-            let totalW = 0, totalC = 0, grandT = 0;
-
-            savedItems.forEach(item => {
-                totalW += item.weight;
-                totalC += item.cbm;
-                grandT += item.cost;
-
-                const tr = document.createElement('tr');
-                tr.className = "group border-b border-slate-50 hover:bg-blue-50/30 transition-all animate-slide-in";
-                tr.innerHTML = `
-                    <td class="py-5 pl-4 font-bold text-slate-700">${item.name}</td>
-                    <td class="py-5 text-center font-medium text-slate-600">${item.weight.toFixed(2)}</td>
-                    <td class="py-5 text-center font-medium text-slate-600">${item.cbm.toFixed(4)}</td>
-                    <td class="py-5 text-center">
-                        <span class="inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${item.method === 'KG' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}">
-                            By ${item.method}
-                        </span>
-                    </td>
-                    <td class="py-5 pr-4 text-right font-black text-slate-800">${item.cost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                    <td class="py-5 text-center">
-                        <button onclick="removeItem('${item.id}')" class="p-2 text-slate-300 hover:text-rose-500 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
-                        </button>
-                    </td>
-                `;
-                list.appendChild(tr);
-            });
-
-            document.getElementById('totalWeight').innerText = totalW.toFixed(2);
-            document.getElementById('totalCbm').innerText = totalC.toFixed(4);
-            document.getElementById('grandTotal').innerText = grandT.toLocaleString(undefined, { minimumFractionDigits: 2 });
-        };
-
-        window.downloadPDF = async () => {
-            const btn = document.getElementById('pdfBtn');
-            const originalContent = btn.innerHTML;
-            btn.innerHTML = `<span class="animate-pulse">กำลังจัดทำไฟล์...</span>`;
-            
-            const now = new Date();
-            document.getElementById('pdfDate').innerText = now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            document.getElementById('pdfRef').innerText = Math.random().toString(36).substring(2, 9).toUpperCase();
-
-            const pdfBody = document.getElementById('pdfTableBody');
-            pdfBody.innerHTML = '';
-            
-            let tw=0, tc=0, gt=0;
-            savedItems.forEach(i => {
-                tw += i.weight; tc += i.cbm; gt += i.cost;
-                pdfBody.innerHTML += `
-                    <tr>
-                        <td style="padding:15px; border-bottom:1px solid #f1f5f9; font-weight:700;">${i.name}</td>
-                        <td style="padding:15px; border-bottom:1px solid #f1f5f9; text-align:center;">${i.weight.toFixed(2)}</td>
-                        <td style="padding:15px; border-bottom:1px solid #f1f5f9; text-align:center;">${i.cbm.toFixed(4)}</td>
-                        <td style="padding:15px; border-bottom:1px solid #f1f5f9; text-align:right; font-weight:700;">${i.cost.toLocaleString(undefined, {minimumFractionDigits:2})}</td>
-                    </tr>
-                `;
-            });
-
-            document.getElementById('pdfTotalWeight').innerText = tw.toFixed(2);
-            document.getElementById('pdfTotalCbm').innerText = tc.toFixed(4);
-            document.getElementById('pdfGrandTotal').innerText = gt.toLocaleString(undefined, {minimumFractionDigits:2}) + " บาท";
-
-            const report = document.getElementById('pdfReport');
-            
-            try {
-                const canvas = await html2canvas(report, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/png');
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-                pdf.save(`Import-Summary-${Date.now()}.pdf`);
-            } catch (e) { console.error("PDF generation failed:", e); } finally { btn.innerHTML = originalContent; }
-        };
-
-        window.clearInputs = () => {
-            document.getElementById('itemName').value = '';
-            document.getElementById('weight').value = '';
-            document.getElementById('width').value = '';
-            document.getElementById('length').value = '';
-            document.getElementById('height').value = '';
-            document.getElementById('inputDirectCbm').value = '';
-            calculateCurrent();
-        };
-
-        const inputs = document.querySelectorAll('.calc-input');
-        inputs.forEach(input => input.addEventListener('input', calculateCurrent));
-
-    </script>
-</body>
-</html>
+export default App;
