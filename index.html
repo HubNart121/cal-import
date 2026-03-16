@@ -3,160 +3,356 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบคำนวณค่าขนส่ง</title>
+    <title>ระบบคำนวณค่าขนส่ง Pro - จัดการโปรเจกต์</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Sarabun', sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
         input::-webkit-outer-spin-button,
         input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
-        .animate-fade-in {
-            animation: fadeIn 0.3s ease-out;
+        
+        .active-project {
+            background: linear-gradient(to right, #eff6ff, #ffffff);
+            color: #2563eb;
+            border-left: 4px solid #2563eb;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+
+        /* Print Styles */
+        @media print {
+            @page { size: A4; margin: 1cm; }
+            body { background: white !important; padding: 0 !important; }
+            .no-print { display: none !important; }
+            #sidebar { display: none !important; }
+            main { margin: 0 !important; width: 100% !important; }
+            .max-w-3xl { max-width: 100% !important; width: 100% !important; }
+            header { border-radius: 0 !important; background: #2563eb !important; color: white !important; padding: 2rem !important; }
+            .fixed-footer { position: static !important; border-top: 2px solid #334155 !important; margin-top: 2rem !important; }
+            .item-card { break-inside: avoid; border: 1px solid #e2e8f0 !important; margin-bottom: 1rem !important; box-shadow: none !important; }
+            .bg-slate-50 { background: #f8fafc !important; }
+        }
+
+        .animate-in-side { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-15px); }
+            to { opacity: 1; transform: translateX(0); }
         }
     </style>
 </head>
-<body class="min-h-screen bg-slate-50 text-slate-800 pb-48">
+<body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col md:flex-row overflow-x-hidden">
 
-    <div class="max-w-3xl mx-auto p-4 md:p-8 space-y-6">
-        <!-- Header -->
-        <header class="bg-blue-600 text-white p-8 rounded-3xl shadow-lg flex items-center justify-between">
-            <div>
-                <h1 class="text-3xl font-bold flex items-center gap-3">
-                    <i data-lucide="truck" class="w-8 h-8"></i>
-                    ระบบคำนวณค่าขนส่ง
-                </h1>
-                <p class="opacity-90 text-base mt-1">Shipping Calculator (GitHub Ready)</p>
-            </div>
-            <i data-lucide="calculator" class="w-12 h-12 opacity-20"></i>
-        </header>
-
-        <!-- Rates Config -->
-        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h2 class="text-lg font-bold mb-4 flex items-center gap-2 border-b pb-2 text-slate-700">
-                <i data-lucide="info" class="w-5 h-5 text-blue-500"></i>
-                ตั้งค่าอัตราค่าบริการ (Rates)
-            </h2>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1">
-                    <label class="text-sm font-semibold text-slate-500">ราคาต่อกิโลกรัม (฿/Kg.)</label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-slate-400 text-base font-bold">฿</span>
-                        <input type="number" id="rateKg" value="15" oninput="calculateAll()"
-                            class="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg">
-                    </div>
+    <!-- Sidebar (Projects Management) -->
+    <aside id="sidebar" class="no-print w-full md:w-80 bg-white border-r border-slate-200 h-auto md:h-screen md:sticky md:top-0 overflow-hidden flex flex-col z-40 shadow-sm">
+        <div class="p-8 border-b border-slate-100 bg-white">
+            <div class="flex items-center gap-4 mb-2">
+                <div class="bg-indigo-600 p-2.5 rounded-2xl text-white shadow-indigo-200 shadow-lg">
+                    <i data-lucide="layout-grid" class="w-6 h-6"></i>
                 </div>
-                <div class="space-y-1">
-                    <label class="text-sm font-semibold text-slate-500">ราคาต่อคิว (฿/CBM)</label>
-                    <div class="relative">
-                        <span class="absolute left-3 top-2.5 text-slate-400 text-base font-bold">฿</span>
-                        <input type="number" id="rateCbm" value="6000" oninput="calculateAll()"
-                            class="w-full pl-8 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-lg">
-                    </div>
+                <div>
+                    <h2 class="text-xl font-extrabold text-slate-900 tracking-tight leading-none">Logistics</h2>
+                    <p class="text-[10px] uppercase tracking-[0.2em] font-bold text-slate-400 mt-1">Manager Pro</p>
                 </div>
-            </div>
-        </section>
-
-        <!-- Items Container -->
-        <div class="space-y-6">
-            <div class="flex justify-between items-center px-2">
-                <h2 class="text-xl font-bold flex items-center gap-2 text-slate-700">
-                    <i data-lucide="package" class="w-6 h-6 text-orange-500"></i>
-                    รายการพัสดุ (<span id="itemCount">1</span>)
-                </h2>
-                <button onclick="addItem()"
-                    class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl text-base font-bold transition-all shadow-md active:scale-95">
-                    <i data-lucide="plus" class="w-5 h-5"></i> เพิ่มรายการ
-                </button>
-            </div>
-
-            <div id="itemsList" class="space-y-6">
-                <!-- Items will be injected here -->
             </div>
         </div>
-    </div>
 
-    <!-- Floating Footer Summary -->
-    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-[0_-15px_30px_-10px_rgba(0,0,0,0.15)] p-6 z-50">
-        <div class="max-w-3xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="flex gap-8 text-center md:text-left overflow-x-auto w-full md:w-auto pb-4 md:pb-0">
-                <div>
-                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total Weight</p>
-                    <p class="text-xl font-black text-slate-800"><span id="totalWeight">0</span> <span class="text-sm font-normal text-slate-500 ml-1">Kg</span></p>
+        <div class="p-6 flex-grow overflow-y-auto custom-scrollbar">
+            <button onclick="addProject()" class="w-full flex items-center justify-center gap-3 bg-slate-900 text-white hover:bg-slate-800 py-3.5 rounded-2xl font-bold transition-all mb-8 shadow-md hover:shadow-lg active:scale-[0.98]">
+                <i data-lucide="plus" class="w-5 h-5"></i> เพิ่มโปรเจกต์ใหม่
+            </button>
+
+            <div class="mb-4">
+                <p class="text-[10px] uppercase font-black text-slate-400 tracking-widest px-4 mb-2">Projects List</p>
+                <nav id="projectList" class="space-y-1">
+                    <!-- Project menu items will be injected here -->
+                </nav>
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-slate-100 bg-slate-50/50">
+            <div class="flex items-center gap-3 px-4 py-2 opacity-50">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+                <span class="text-xs font-bold">App Settings</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-grow w-full relative">
+        <div class="max-w-4xl mx-auto p-4 md:p-10 space-y-8 pb-52">
+            <!-- Header Card -->
+            <header class="bg-indigo-600 text-white p-10 rounded-[2.5rem] shadow-2xl shadow-indigo-200 relative overflow-hidden">
+                <div class="relative z-10">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="bg-indigo-500/30 text-indigo-100 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">Active Project</span>
+                            </div>
+                            <h1 id="activeProjectNameHeader" class="text-4xl font-extrabold tracking-tight mb-2">
+                                โครงการเริ่มต้น
+                            </h1>
+                            <div class="flex items-center gap-4 text-indigo-100/80 text-sm">
+                                <span class="flex items-center gap-1.5"><i data-lucide="calendar" class="w-4 h-4"></i> <span id="currentDate">--/--/----</span></span>
+                                <span class="flex items-center gap-1.5"><i data-lucide="box" class="w-4 h-4"></i> <span id="itemCountDisplay">0 Items</span></span>
+                            </div>
+                        </div>
+                        <div class="no-print flex gap-3">
+                            <button onclick="handlePrint()" class="bg-white text-indigo-600 hover:bg-indigo-50 px-6 py-3.5 rounded-2xl transition-all shadow-xl shadow-indigo-900/20 flex items-center gap-3 font-bold active:scale-95">
+                                <i data-lucide="printer" class="w-5 h-5"></i> พิมพ์รายงาน PDF
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div class="border-l border-slate-200 pl-8">
-                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total CBM</p>
-                    <p class="text-xl font-black text-slate-800"><span id="totalCbm">0.0000</span> <span class="text-sm font-normal text-slate-500 ml-1">CBM</span></p>
-                </div>
-                <div class="border-l border-slate-200 pl-8 hidden md:block">
-                    <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Items</p>
-                    <p class="text-xl font-black text-slate-800"><span id="totalItems">1</span> <span class="text-sm font-normal text-slate-500 ml-1">Boxes</span></p>
+                <!-- Abstract Background shapes -->
+                <div class="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500 rounded-full opacity-20 blur-3xl"></div>
+                <div class="absolute -left-10 -bottom-10 w-48 h-48 bg-indigo-400 rounded-full opacity-20 blur-2xl"></div>
+            </header>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                <!-- Rates Config (Small Sticky on Desktop) -->
+                <aside class="lg:col-span-4 lg:sticky lg:top-8 space-y-6">
+                    <section class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100">
+                        <h2 class="text-sm font-black mb-6 flex items-center gap-2 text-slate-400 uppercase tracking-widest">
+                            <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i> อัตราค่าบริการ
+                        </h2>
+                        <div class="space-y-5">
+                            <div class="group">
+                                <label class="text-xs font-bold text-slate-500 mb-1.5 block px-1 group-focus-within:text-indigo-600 transition-colors">ราคาต่อกิโลกรัม (฿/Kg.)</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-3.5 text-slate-300 text-lg font-bold group-focus-within:text-indigo-600">฿</span>
+                                    <input type="number" id="rateKg" value="15" oninput="updateActiveProjectRates()"
+                                        class="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none font-black text-xl transition-all">
+                                </div>
+                            </div>
+                            <div class="group">
+                                <label class="text-xs font-bold text-slate-500 mb-1.5 block px-1 group-focus-within:text-indigo-600 transition-colors">ราคาต่อคิว (฿/CBM)</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-3.5 text-slate-300 text-lg font-bold group-focus-within:text-indigo-600">฿</span>
+                                    <input type="number" id="rateCbm" value="6000" oninput="updateActiveProjectRates()"
+                                        class="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white outline-none font-black text-xl transition-all">
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Quick Info -->
+                    <div class="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 no-print">
+                        <div class="flex gap-3">
+                            <i data-lucide="info" class="w-5 h-5 text-indigo-500 shrink-0"></i>
+                            <p class="text-xs text-indigo-700 leading-relaxed">
+                                ระบบจะเลือก <b>ราคาที่สูงกว่า</b> ระหว่างน้ำหนักและปริมาตรเพื่อเป็นค่าขนส่งสุทธิ
+                            </p>
+                        </div>
+                    </div>
+                </aside>
+
+                <!-- Items List -->
+                <div class="lg:col-span-8 space-y-6">
+                    <div class="flex justify-between items-center px-4">
+                        <h2 class="text-xl font-bold flex items-center gap-3 text-slate-900">
+                            <i data-lucide="package-2" class="w-6 h-6 text-indigo-600"></i>
+                            รายการพัสดุ
+                        </h2>
+                        <button onclick="addItem()"
+                            class="no-print flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-6 py-3 rounded-2xl text-sm font-bold transition-all shadow-lg active:scale-95">
+                            <i data-lucide="plus" class="w-4 h-4"></i> เพิ่มกล่อง
+                        </button>
+                    </div>
+
+                    <div id="itemsList" class="space-y-6">
+                        <!-- Items injected here -->
+                    </div>
                 </div>
             </div>
-            
-            <div class="flex items-center gap-6 w-full md:w-auto border-t md:border-t-0 pt-6 md:pt-0">
-                <div class="text-right flex-grow md:flex-grow-0">
-                    <p class="text-xs font-black text-blue-600 uppercase tracking-widest mb-1">Grand Total (รวมทั้งหมด)</p>
-                    <p class="text-4xl font-black text-slate-900 leading-none">฿<span id="grandTotal">0</span></p>
+        </div>
+    </main>
+
+    <!-- Floating Footer Summary -->
+    <div id="summaryFooter" class="fixed-footer fixed bottom-0 left-0 right-0 md:left-80 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-6 z-50 shadow-[0_-20px_40px_rgba(0,0,0,0.05)]">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-6">
+                <div class="flex gap-10 items-center overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
+                    <div class="shrink-0">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><i data-lucide="scale-3d" class="w-3 h-3 text-indigo-500"></i> Weight</p>
+                        <p class="text-2xl font-black text-slate-900"><span id="totalWeight">0</span><span class="text-xs font-bold text-slate-400 ml-1.5">Kg</span></p>
+                    </div>
+                    <div class="shrink-0 pl-10 border-l border-slate-100">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><i data-lucide="box-select" class="w-3 h-3 text-indigo-500"></i> CBM</p>
+                        <p class="text-2xl font-black text-slate-900"><span id="totalCbm">0.0000</span><span class="text-xs font-bold text-slate-400 ml-1.5">M³</span></p>
+                    </div>
                 </div>
-                <div class="bg-blue-600 p-3 rounded-2xl text-white shadow-xl hidden sm:block">
-                    <i data-lucide="receipt-text" class="w-8 h-8"></i>
+                
+                <div class="flex items-center gap-6 justify-between md:justify-end bg-slate-900 p-5 md:p-6 md:px-10 rounded-[2rem] text-white shadow-xl shadow-slate-200">
+                    <div class="text-right">
+                        <p class="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Grand Total Sum</p>
+                        <div class="flex items-baseline gap-1 justify-end">
+                            <span class="text-lg font-bold text-indigo-300">฿</span>
+                            <span id="grandTotal" class="text-4xl font-black leading-none tracking-tight">0</span>
+                        </div>
+                    </div>
+                    <div class="bg-indigo-500/20 p-3 rounded-2xl text-indigo-400 hidden sm:block">
+                        <i data-lucide="file-check" class="w-8 h-8"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let items = [
-            { id: Date.now(), name: '', weight: '', width: '', length: '', height: '', manualCbm: '', inputMode: 'dimensions' }
+        // ข้อมูลหลัก
+        let projects = JSON.parse(localStorage.getItem('shipping_projects')) || [
+            { 
+                id: Date.now(), 
+                name: 'โครงการนำเข้าล็อตแรก', 
+                rateKg: 15, 
+                rateCbm: 6000, 
+                items: [
+                    { id: Date.now() + 1, name: '', weight: '', width: '', length: '', height: '', manualCbm: '', inputMode: 'dimensions' }
+                ] 
+            }
         ];
+        
+        let activeProjectId = projects[0].id;
+
+        function saveToLocal() {
+            localStorage.setItem('shipping_projects', JSON.stringify(projects));
+        }
+
+        function getActiveProject() {
+            return projects.find(p => p.id === activeProjectId);
+        }
+
+        function handlePrint() {
+            const btn = event.currentTarget;
+            btn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i> เตรียมเอกสาร...';
+            lucide.createIcons();
+            
+            setTimeout(() => {
+                window.print();
+                btn.innerHTML = '<i data-lucide="printer" class="w-5 h-5"></i> พิมพ์รายงาน PDF';
+                lucide.createIcons();
+            }, 500);
+        }
+
+        function addProject() {
+            const name = prompt("ระบุชื่อโครงการใหม่ของคุณ:", `โครงการ ${projects.length + 1}`);
+            if (name) {
+                const newId = Date.now();
+                projects.push({
+                    id: newId,
+                    name: name,
+                    rateKg: 15,
+                    rateCbm: 6000,
+                    items: [
+                        { id: Date.now() + 1, name: '', weight: '', width: '', length: '', height: '', manualCbm: '', inputMode: 'dimensions' }
+                    ]
+                });
+                saveToLocal();
+                switchProject(newId);
+            }
+        }
+
+        function switchProject(id) {
+            activeProjectId = id;
+            const project = getActiveProject();
+            document.getElementById('rateKg').value = project.rateKg;
+            document.getElementById('rateCbm').value = project.rateCbm;
+            document.getElementById('activeProjectNameHeader').textContent = project.name;
+            renderProjectList();
+            renderItems();
+        }
+
+        function deleteProject(id, event) {
+            event.stopPropagation();
+            if (projects.length <= 1) return;
+            if (confirm("คุณต้องการลบโครงการนี้ใช่หรือไม่? ข้อมูลพัสดุจะหายไปทั้งหมด")) {
+                projects = projects.filter(p => p.id !== id);
+                if (activeProjectId === id) activeProjectId = projects[0].id;
+                saveToLocal();
+                switchProject(activeProjectId);
+            }
+        }
+
+        function editProjectName(id, event) {
+            event.stopPropagation();
+            const project = projects.find(p => p.id === id);
+            const newName = prompt("แก้ไขชื่อโครงการ:", project.name);
+            if (newName) {
+                project.name = newName;
+                saveToLocal();
+                if (activeProjectId === id) document.getElementById('activeProjectNameHeader').textContent = newName;
+                renderProjectList();
+            }
+        }
+
+        function updateActiveProjectRates() {
+            const project = getActiveProject();
+            project.rateKg = parseFloat(document.getElementById('rateKg').value) || 0;
+            project.rateCbm = parseFloat(document.getElementById('rateCbm').value) || 0;
+            saveToLocal();
+            renderItems(); 
+        }
 
         function addItem() {
-            items.push({
+            const project = getActiveProject();
+            project.items.push({
                 id: Date.now(),
-                name: '',
-                weight: '',
-                width: '',
-                length: '',
-                height: '',
-                manualCbm: '',
-                inputMode: 'dimensions'
+                name: '', weight: '', width: '', length: '', height: '', manualCbm: '', inputMode: 'dimensions'
             });
+            saveToLocal();
             renderItems();
         }
 
         function removeItem(id) {
-            if (items.length > 1) {
-                items = items.filter(item => item.id !== id);
+            const project = getActiveProject();
+            if (project.items.length > 1) {
+                project.items = project.items.filter(item => item.id !== id);
+                saveToLocal();
                 renderItems();
             }
         }
 
         function updateItem(id, field, value) {
-            const item = items.find(i => i.id === id);
+            const project = getActiveProject();
+            const item = project.items.find(i => i.id === id);
             if (item) {
                 item[field] = value;
-                calculateAll();
-                // Update local calculation display without full re-render for better UX
+                saveToLocal();
                 updateItemDisplay(id);
+                calculateAll();
             }
         }
 
         function setInputMode(id, mode) {
-            const item = items.find(i => i.id === id);
+            const project = getActiveProject();
+            const item = project.items.find(i => i.id === id);
             if (item) {
                 item.inputMode = mode;
+                saveToLocal();
                 renderItems();
             }
         }
@@ -169,183 +365,166 @@
             }).format(num || 0);
         }
 
-        function calculateItem(item) {
-            const rKg = parseFloat(document.getElementById('rateKg').value) || 0;
-            const rCbm = parseFloat(document.getElementById('rateCbm').value) || 0;
-
+        function calculateItem(item, rateKg, rateCbm) {
             const w = parseFloat(item.weight) || 0;
             let cbm = 0;
             if (item.inputMode === 'dimensions') {
-                const width = parseFloat(item.width) || 0;
-                const length = parseFloat(item.length) || 0;
-                const height = parseFloat(item.height) || 0;
-                cbm = (width * length * height) / 1000000;
+                cbm = ((parseFloat(item.width) || 0) * (parseFloat(item.length) || 0) * (parseFloat(item.height) || 0)) / 1000000;
             } else {
                 cbm = parseFloat(item.manualCbm) || 0;
             }
-
-            const pWeight = w * rKg;
-            const pCbm = cbm * rCbm;
-            const useCost = Math.max(pWeight, pCbm);
-
-            return { cbm, pWeight, pCbm, useCost };
+            const pWeight = w * rateKg;
+            const pCbm = cbm * rateCbm;
+            return { cbm, pWeight, pCbm, useCost: Math.max(pWeight, pCbm) };
         }
 
         function calculateAll() {
-            let totalWeight = 0;
-            let totalCbm = 0;
-            let totalCost = 0;
-
-            items.forEach(item => {
-                const res = calculateItem(item);
-                totalWeight += (parseFloat(item.weight) || 0);
-                totalCbm += res.cbm;
-                totalCost += res.useCost;
+            const project = getActiveProject();
+            let tw = 0, tc = 0, tcost = 0;
+            project.items.forEach(item => {
+                const res = calculateItem(item, project.rateKg, project.rateCbm);
+                tw += (parseFloat(item.weight) || 0);
+                tc += res.cbm;
+                tcost += res.useCost;
             });
-
-            document.getElementById('totalWeight').textContent = formatNumber(totalWeight);
-            document.getElementById('totalCbm').textContent = totalCbm.toFixed(4);
-            document.getElementById('grandTotal').textContent = formatNumber(totalCost);
-            document.getElementById('itemCount').textContent = items.length;
-            document.getElementById('totalItems').textContent = items.length;
+            document.getElementById('totalWeight').textContent = formatNumber(tw);
+            document.getElementById('totalCbm').textContent = tc.toFixed(4);
+            document.getElementById('grandTotal').textContent = formatNumber(tcost);
+            document.getElementById('totalItems').textContent = project.items.length;
+            document.getElementById('itemCountDisplay').textContent = `${project.items.length} Items`;
         }
 
         function updateItemDisplay(id) {
-            const item = items.find(i => i.id === id);
-            const res = calculateItem(item);
+            const project = getActiveProject();
+            const item = project.items.find(i => i.id === id);
+            const res = calculateItem(item, project.rateKg, project.rateCbm);
             const isCbmHigher = res.pCbm > res.pWeight;
-
             const container = document.querySelector(`[data-id="${id}"]`);
             if (!container) return;
 
             container.querySelector('.display-cbm').textContent = res.cbm.toFixed(4);
-            container.querySelector('.display-name').textContent = item.name || `ชิ้นที่ ${items.indexOf(item) + 1}`;
+            container.querySelector('.display-name-label').textContent = item.name || `ITEM #${project.items.indexOf(item) + 1}`;
             
             const pWeightEl = container.querySelector('.price-weight');
             const pCbmEl = container.querySelector('.price-cbm');
-            
             pWeightEl.textContent = `฿${formatNumber(res.pWeight)}`;
             pCbmEl.textContent = `฿${formatNumber(res.pCbm)}`;
 
-            // Classes for highlight
-            if (isCbmHigher) {
-                pWeightEl.parentElement.className = "flex justify-between items-center text-base text-slate-400";
-                pCbmEl.parentElement.className = "flex justify-between items-center text-base font-bold text-slate-800";
-            } else {
-                pWeightEl.parentElement.className = "flex justify-between items-center text-base font-bold text-slate-800";
-                pCbmEl.parentElement.className = "flex justify-between items-center text-base text-slate-400";
-            }
+            pWeightEl.parentElement.className = `flex justify-between items-center text-sm ${!isCbmHigher ? 'font-bold text-slate-900 bg-indigo-50/50 -mx-2 px-2 py-1 rounded-lg transition-all' : 'text-slate-400'}`;
+            pCbmEl.parentElement.className = `flex justify-between items-center text-sm ${isCbmHigher ? 'font-bold text-slate-900 bg-indigo-50/50 -mx-2 px-2 py-1 rounded-lg transition-all' : 'text-slate-400'}`;
+            container.querySelector('.use-cost').textContent = `${formatNumber(res.useCost)}`;
+        }
 
-            container.querySelector('.use-cost').textContent = `฿${formatNumber(res.useCost)}`;
+        function renderProjectList() {
+            const list = document.getElementById('projectList');
+            list.innerHTML = '';
+            projects.forEach(p => {
+                const isActive = p.id === activeProjectId;
+                const div = document.createElement('div');
+                div.onclick = () => switchProject(p.id);
+                div.className = `group flex items-center justify-between px-5 py-4 rounded-2xl cursor-pointer transition-all duration-200 ${isActive ? 'active-project shadow-sm font-bold' : 'hover:bg-slate-50 text-slate-500 hover:text-slate-900'}`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center gap-4 truncate">
+                        <i data-lucide="${isActive ? 'folder-open' : 'folder'}" class="w-5 h-5 shrink-0 transition-colors ${isActive ? 'text-indigo-600' : 'text-slate-300'}"></i>
+                        <span class="truncate text-sm tracking-tight">${p.name}</span>
+                    </div>
+                    <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-print">
+                        <button onclick="editProjectName(${p.id}, event)" class="p-1.5 hover:bg-white hover:text-indigo-600 rounded-lg"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+                        <button onclick="deleteProject(${p.id}, event)" class="p-1.5 hover:bg-white hover:text-red-500 rounded-lg"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            lucide.createIcons();
         }
 
         function renderItems() {
+            const project = getActiveProject();
             const list = document.getElementById('itemsList');
             list.innerHTML = '';
-
-            items.forEach((item, index) => {
-                const res = calculateItem(item);
+            
+            project.items.forEach((item, index) => {
+                const res = calculateItem(item, project.rateKg, project.rateCbm);
                 const isCbmHigher = res.pCbm > res.pWeight;
                 const id = item.id;
-
-                const itemHtml = `
-                    <div data-id="${id}" class="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden animate-fade-in">
-                        <div class="bg-slate-50 px-6 py-4 flex justify-between items-center border-b border-slate-100">
-                            <div class="flex items-center gap-3 flex-grow mr-4">
-                                <span class="bg-blue-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm shrink-0">
-                                    ${index + 1}
-                                </span>
-                                <input type="text" placeholder="ตั้งชื่อรายการที่ ${index + 1}" value="${item.name}"
-                                    oninput="updateItem(${id}, 'name', this.value)"
-                                    class="bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none text-lg font-bold text-slate-700 w-full placeholder:text-slate-300 placeholder:font-normal">
+                const html = `
+                    <div data-id="${id}" class="bg-white rounded-[2rem] shadow-sm border border-slate-100 overflow-hidden animate-in-side">
+                        <div class="bg-slate-50 px-8 py-5 flex justify-between items-center border-b border-slate-100">
+                            <div class="flex items-center gap-4 flex-grow">
+                                <span class="bg-slate-900 text-white w-9 h-9 rounded-2xl flex items-center justify-center text-sm font-black shadow-md shrink-0">${index + 1}</span>
+                                <input type="text" placeholder="ระบุชื่อพัสดุ (เช่น อะไหล่แอร์, เฟอร์นิเจอร์...)" value="${item.name}" oninput="updateItem(${id}, 'name', this.value)"
+                                    class="bg-transparent border-b border-dashed border-slate-300 focus:border-indigo-500 outline-none text-lg font-bold text-slate-900 w-full placeholder:text-slate-300 placeholder:font-medium transition-colors">
                             </div>
-                            ${items.length > 1 ? `
-                                <button onclick="removeItem(${id})" class="text-slate-400 hover:text-red-500 p-2 transition-colors bg-white rounded-lg border border-slate-100 shadow-sm shrink-0">
-                                    <i data-lucide="trash-2" class="w-5 h-5"></i>
-                                </button>
-                            ` : ''}
+                            ${project.items.length > 1 ? `<button onclick="removeItem(${id})" class="no-print text-slate-300 hover:text-red-500 p-2 ml-4 transition-all hover:scale-110"><i data-lucide="x" class="w-5 h-5"></i></button>` : ''}
                         </div>
-
-                        <div class="p-6 grid grid-cols-1 md:grid-cols-12 gap-8">
-                            <div class="md:col-span-7 space-y-6">
-                                <div class="grid grid-cols-1 gap-6">
-                                    <div class="space-y-2">
-                                        <label class="text-xs uppercase font-black text-slate-400 tracking-widest flex items-center gap-1">
-                                            <i data-lucide="scale" class="w-3 h-3"></i> น้ำหนัก (Kg.)
+                        <div class="p-8 grid grid-cols-1 md:grid-cols-12 gap-10">
+                            <div class="md:col-span-7 space-y-8">
+                                <div class="space-y-3">
+                                    <label class="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] flex items-center gap-2 px-1">
+                                        <i data-lucide="scale-3d" class="w-3.5 h-3.5"></i> Weightน้ำหนักสุทธิ
+                                    </label>
+                                    <input type="number" placeholder="0.00" value="${item.weight}" oninput="updateItem(${id}, 'weight', this.value)" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all placeholder:text-slate-200">
+                                </div>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center px-1">
+                                        <label class="text-[10px] uppercase font-black text-slate-400 tracking-[0.2em] flex items-center gap-2">
+                                            <i data-lucide="box" class="w-3.5 h-3.5"></i> Dimensions ขนาด/ปริมาตร
                                         </label>
-                                        <input type="number" placeholder="0.00" value="${item.weight}"
-                                            oninput="updateItem(${id}, 'weight', this.value)"
-                                            class="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none font-bold text-xl">
-                                    </div>
-
-                                    <div class="space-y-3">
-                                        <div class="flex justify-between items-center">
-                                            <label class="text-xs uppercase font-black text-slate-400 tracking-widest flex items-center gap-1">
-                                                <i data-lucide="tag" class="w-3 h-3"></i> ขนาดหรือปริมาตร
-                                            </label>
-                                            <div class="flex bg-slate-100 p-1 rounded-xl shadow-inner">
-                                                <button onclick="setInputMode(${id}, 'dimensions')"
-                                                    class="px-4 py-1.5 text-xs font-black rounded-lg transition-all ${item.inputMode === 'dimensions' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}">
-                                                    SIZE
-                                                </button>
-                                                <button onclick="setInputMode(${id}, 'direct_cbm')"
-                                                    class="px-4 py-1.5 text-xs font-black rounded-lg transition-all ${item.inputMode === 'direct_cbm' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}">
-                                                    CBM
-                                                </button>
-                                            </div>
+                                        <div class="flex bg-slate-100 p-1 rounded-xl no-print">
+                                            <button onclick="setInputMode(${id}, 'dimensions')" class="px-4 py-1.5 text-[10px] font-black rounded-lg transition-all ${item.inputMode==='dimensions'?'bg-white shadow-sm text-indigo-600':'text-slate-400 hover:text-slate-600'}">W/L/H</button>
+                                            <button onclick="setInputMode(${id}, 'direct_cbm')" class="px-4 py-1.5 text-[10px] font-black rounded-lg transition-all ${item.inputMode==='direct_cbm'?'bg-white shadow-sm text-indigo-600':'text-slate-400 hover:text-slate-600'}">DIRECT CBM</button>
                                         </div>
-
-                                        ${item.inputMode === 'dimensions' ? `
-                                            <div class="grid grid-cols-3 gap-3">
-                                                <input type="number" placeholder="กว้าง" value="${item.width}" oninput="updateItem(${id}, 'width', this.value)"
-                                                    class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <input type="number" placeholder="ยาว" value="${item.length}" oninput="updateItem(${id}, 'length', this.value)"
-                                                    class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none">
-                                                <input type="number" placeholder="สูง" value="${item.height}" oninput="updateItem(${id}, 'height', this.value)"
-                                                    class="w-full px-3 py-3 bg-slate-50 border border-slate-200 rounded-xl text-center text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none">
-                                            </div>
-                                        ` : `
-                                            <input type="number" step="0.0001" placeholder="ระบุจำนวนคิว (CBM)" value="${item.manualCbm}" oninput="updateItem(${id}, 'manualCbm', this.value)"
-                                                class="w-full px-5 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-xl focus:ring-2 focus:ring-blue-500 outline-none">
-                                        `}
                                     </div>
+                                    ${item.inputMode==='dimensions' ? `
+                                        <div class="grid grid-cols-3 gap-4">
+                                            <div class="space-y-1.5"><input type="number" placeholder="W" value="${item.width}" oninput="updateItem(${id}, 'width', this.value)" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xl font-black outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"></div>
+                                            <div class="space-y-1.5"><input type="number" placeholder="L" value="${item.length}" oninput="updateItem(${id}, 'length', this.value)" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xl font-black outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"></div>
+                                            <div class="space-y-1.5"><input type="number" placeholder="H" value="${item.height}" oninput="updateItem(${id}, 'height', this.value)" class="w-full px-4 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl text-center text-xl font-black outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all"></div>
+                                        </div>
+                                    ` : `
+                                        <input type="number" step="0.0001" placeholder="0.0000" value="${item.manualCbm}" oninput="updateItem(${id}, 'manualCbm', this.value)" class="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all">
+                                    `}
                                 </div>
                             </div>
-
-                            <div class="md:col-span-5 bg-slate-50 rounded-2xl p-6 flex flex-col justify-center border border-slate-100 shadow-inner">
-                                <div class="flex justify-between items-center text-sm text-slate-500 mb-4">
-                                    <span class="font-mono">CBM: <span class="display-cbm">${res.cbm.toFixed(4)}</span></span>
-                                    <span class="font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md max-w-[120px] truncate display-name text-center">
-                                        ${item.name || `ชิ้นที่ ${index + 1}`}
-                                    </span>
+                            <div class="md:col-span-5 bg-indigo-50/30 rounded-3xl p-8 flex flex-col justify-between border border-indigo-100/50">
+                                <div class="flex justify-between items-center text-xs text-slate-500 mb-6">
+                                    <span class="font-bold bg-white px-2.5 py-1 rounded-lg border border-indigo-100 text-indigo-600 shadow-sm">M³ : <span class="display-cbm font-black">${res.cbm.toFixed(4)}</span></span>
+                                    <span class="font-black text-slate-300 uppercase tracking-widest display-name-label truncate max-w-[100px]">${item.name || `ITEM ${index+1}`}</span>
                                 </div>
-                                <div class="space-y-3">
-                                    <div class="flex justify-between items-center text-base ${!isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}">
-                                        <span>ตามน้ำหนัก:</span>
+                                <div class="space-y-4">
+                                    <div class="flex justify-between items-center text-sm ${!isCbmHigher?'font-bold text-slate-900 bg-indigo-50 -mx-2 px-2 py-1.5 rounded-xl':'text-slate-400'}">
+                                        <span class="flex items-center gap-2"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 ${!isCbmHigher?'opacity-100':'opacity-0'}"></i> Weight Base:</span>
                                         <span class="price-weight">฿${formatNumber(res.pWeight)}</span>
                                     </div>
-                                    <div class="flex justify-between items-center text-base ${isCbmHigher ? 'font-bold text-slate-800' : 'text-slate-400'}">
-                                        <span>ตามคิว:</span>
+                                    <div class="flex justify-between items-center text-sm ${isCbmHigher?'font-bold text-slate-900 bg-indigo-50 -mx-2 px-2 py-1.5 rounded-xl':'text-slate-400'}">
+                                        <span class="flex items-center gap-2"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 ${isCbmHigher?'opacity-100':'opacity-0'}"></i> Volume Base:</span>
                                         <span class="price-cbm">฿${formatNumber(res.pCbm)}</span>
                                     </div>
-                                    <div class="mt-4 pt-4 border-t border-slate-200 flex justify-between items-center">
-                                        <span class="text-sm font-black text-slate-500 uppercase tracking-tighter">ค่าส่งชิ้นนี้:</span>
-                                        <span class="text-3xl font-black text-blue-600 use-cost">฿${formatNumber(res.useCost)}</span>
+                                    <div class="mt-6 pt-6 border-t border-indigo-100/50 flex flex-col items-end">
+                                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Item Cost</span>
+                                        <div class="flex items-baseline gap-1">
+                                            <span class="text-indigo-400 font-bold text-sm">฿</span>
+                                            <span class="text-4xl font-black text-slate-900 tracking-tight use-cost">${formatNumber(res.useCost)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 `;
-                list.insertAdjacentHTML('beforeend', itemHtml);
+                list.insertAdjacentHTML('beforeend', html);
             });
-            
             lucide.createIcons();
             calculateAll();
         }
 
-        // Initial render
-        window.onload = renderItems;
+        window.onload = () => {
+            const date = new Date();
+            document.getElementById('currentDate').textContent = date.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
+            renderProjectList();
+            renderItems();
+        };
     </script>
 </body>
 </html>
